@@ -350,6 +350,13 @@ class OIDCClient:
         """Generates a random URL safe string (base64_url encoded)"""
         return self._base64url_encode(os.urandom(length))
 
+    def _issuer_requires_adfs_resource(self, issuer: str | None) -> bool:
+        """Returns True when issuer indicates an ADFS endpoint."""
+        if not issuer:
+            return False
+
+        return "/adfs" in issuer.lower()
+
     async def _get_http_session(self) -> aiohttp.ClientSession:
         """Create or get the existing client session with custom networking/TLS options"""
         if self.http_session is not None:
@@ -595,7 +602,12 @@ class OIDCClient:
         # Fetch userinfo if there is an userinfo_endpoint available
         # and use the data to supply the missing values in id_token
         discovery_document = await self._fetch_discovery_document()
-        if "userinfo_endpoint" in discovery_document:
+        if (
+            "userinfo_endpoint" in discovery_document
+            and not self._issuer_requires_adfs_resource(
+                discovery_document.get("issuer")
+            )
+        ):
             userinfo_endpoint = discovery_document["userinfo_endpoint"]
             userinfo = await self._get_userinfo(userinfo_endpoint, access_token)
 
